@@ -1,0 +1,34 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "nodemon index.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/code-comp/server.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/code-comp/server/issues"
+  },
+  "homepage": "https://github.com/code-comp/server#readme",
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "fs-extra": "^10.1.0",
+    "jsonwebtoken": "^8.5.1",
+    "zod": "^3.19.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.14",
+    "@types/fs-extra": "^9.0.13",
+    "@types/jsonwebtoken": "^8.5.9",
+    "@types/nodemon": "^1.19.2",
+    "nodemon": "^2.0.20"
+  }
+}
