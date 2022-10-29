@@ -71,38 +71,32 @@ router
 		});
 	});
 
-// Get the user by ID or username
+// Get the user by ID
 router
 	.route("/:id")
 
 	// GET /api/users/:id
-	.get(async (req, res) => {
+	.get(isAuthorized, async (req, res) => {
 		const users = await db.read();
 
 		// Find the user in the database
-		const user = users.find(user => [user.id, user.username].includes(req.params.id));
-
+		const index = findIndex(users, req, res);
 		// Error if the user is not found
-		if (!user) {
-			return res.status(404).json({
-				success: false,
-				message: "User not found",
-			});
-		}
+		if (index === -1) return;
 
 		// Remove the password from the response
-		delete user.password;
+		delete users[index].password;
 
 		// Send the user data
 		return res.json({
 			success: true,
 			message: "User retrieved successfully",
-			user,
+			user: users[index],
 		});
 	})
 
 	// PUT /api/users/:id
-	.put(async (req, res) => {
+	.put(isAuthorized, async (req, res) => {
 		// Find the user in the database
 		const users = await db.read();
 		const index = findIndex(users, req, res);
@@ -122,7 +116,7 @@ router
 	})
 
 	// PATCH /api/users/:id
-	.patch(async (req, res) => {
+	.patch(isAuthorized, async (req, res) => {
 		// Find the user in the database
 		const users = await db.read();
 		const index = findIndex(users, req, res);
@@ -143,7 +137,7 @@ router
 	})
 
 	// DELETE /api/users/:id
-	.delete(async (req, res) => {
+	.delete(isAuthorized, async (req, res) => {
 		// Find the user in the database
 		const users = await db.read();
 		const index = findIndex(users, req, res);
@@ -180,6 +174,18 @@ router
  * @param {Express.Response} res
  * @param {Express.NextFunction} next
  */
+function isAuthorized(req, res, next) {
+	if (req.user?.id !== req.params.id) {
+		console.log(req.user, req.params.id);
+		res.status(403).json({
+			success: false,
+			message: "Forbidden",
+		});
+	} else {
+		next();
+	}
+}
+
 /**
  * Find the index of a user in the database
  * @param {User[]} users Users from the database
@@ -196,15 +202,6 @@ function findIndex(users, req, res) {
 		res.status(404).json({
 			success: false,
 			message: "User not found",
-		});
-		return -1;
-	}
-
-	// Error if not authorized
-	if (req.user.id !== req.params.id) {
-		res.status(403).json({
-			success: false,
-			message: "Forbidden",
 		});
 		return -1;
 	}
