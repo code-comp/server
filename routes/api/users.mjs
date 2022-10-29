@@ -1,8 +1,7 @@
-import bodyParser from "body-parser";
 import crypto from "crypto";
 import { Router } from "express";
-import { read, write } from "../../data/interface.mjs";
-import { Password } from "./auth.mjs";
+import { database, Password } from "../../data/database.mjs";
+const db = database("users");
 
 const router = Router();
 
@@ -13,7 +12,7 @@ router
 	// GET /api/users
 	.get(async (req, res) => {
 		// Read from the database
-		const users = await read();
+		const users = await db.read();
 
 		// Remove passwords from the response
 		return res.json({
@@ -28,9 +27,8 @@ router
 
 	// POST /api/users
 	.post(async (req, res) => {
-		// Check if the user already exists
-		const users = await read();
-		if (alreadyExists(users, req, res)) return;
+		// Read from the database
+		const users = await db.read();
 
 		// Add a new user to the database
 		users.push({
@@ -42,11 +40,23 @@ router
 				updated: new Date(),
 			},
 		});
-		await write(users, res);
+		await db.write(users, res);
+	})
+
+	// OPTIONS /api/users
+	.options(async (req, res) => {
+		// Allow CORS preflight
+		res.set("Access-Control-Allow-Origin", "*");
+		res.set("Access-Control-Allow-Methods", "POST");
+		res.set("Access-Control-Allow-Headers", "Content-Type");
+		res.set("Access-Control-Max-Age", "3600");
+		res.set("Allow", "GET, POST");
+		res.status(204).end();
 	})
 
 	// All other methods
 	.all(async (req, res) => {
+		res.set("Allow", "GET, POST");
 		return res.status(405).json({
 			success: false,
 			message: "Method not allowed",
@@ -59,7 +69,7 @@ router
 
 	// GET /api/users/:id
 	.get(async (req, res) => {
-		const users = await read();
+		const users = await db.read();
 
 		// Find the user in the database
 		const user = users.find(user => [user.id, user.username].includes(req.params.id));
@@ -86,12 +96,9 @@ router
 	// PUT /api/users/:id
 	.put(async (req, res) => {
 		// Find the user in the database
-		const users = await read();
+		const users = await db.read();
 		const index = findIndex(users, req, res);
 		if (index === -1) return;
-
-		// Check if the user already exists
-		if (alreadyExists(users, req, res)) return;
 
 		// Replace the user data in the database
 		users[index] = {
@@ -103,18 +110,15 @@ router
 				updated: new Date(),
 			},
 		};
-		await write(users, res);
+		await db.write(users, res);
 	})
 
 	// PATCH /api/users/:id
 	.patch(async (req, res) => {
 		// Find the user in the database
-		const users = await read();
+		const users = await db.read();
 		const index = findIndex(users, req, res);
 		if (index === -1) return;
-
-		// Check if the user already exists
-		if (alreadyExists(users, req, res)) return;
 
 		// Update the user data in the database
 		users[index] = {
@@ -127,23 +131,35 @@ router
 				updated: new Date(),
 			},
 		};
-		await write(users, res);
+		await db.write(users, res);
 	})
 
 	// DELETE /api/users/:id
 	.delete(async (req, res) => {
 		// Find the user in the database
-		const users = await read();
+		const users = await db.read();
 		const index = findIndex(users, req, res);
 		if (index === -1) return;
 
 		// Remove the user from the database
 		users.splice(index, 1);
-		await write(users, res);
+		await db.write(users, res);
+	})
+
+	// OPTIONS /api/users/:id
+	.options(async (req, res) => {
+		// Allow CORS preflight
+		res.set("Access-Control-Allow-Origin", "*");
+		res.set("Access-Control-Allow-Methods", "POST");
+		res.set("Access-Control-Allow-Headers", "Content-Type");
+		res.set("Access-Control-Max-Age", "3600");
+		res.set("Allow", "GET, PUT, PATCH, DELETE");
+		res.status(204).end();
 	})
 
 	// All other methods
 	.all(async (req, res) => {
+		res.set("Allow", "GET, PUT, PATCH, DELETE");
 		return res.status(405).json({
 			success: false,
 			message: "Method not allowed",
@@ -151,15 +167,15 @@ router
 	});
 
 /**
- * Find the index of a user in the database
+ * Find the index of a user in the database if authorized
  * @param {User[]} users Users from the database
  * @param {Express.Request} req Request object
  * @param {Express.Response} res Response object
- * @returns Index of the user in the database
+ * @returns Index of the user in the database or -1 if not found or not authorized
  */
 function findIndex(users, req, res) {
 	// Find the user in the database
-	const index = users.findIndex(user => [user.id, user.username].includes(req.params.id));
+	const index = users.findIndex(user => user.id === req.params.id);
 
 	// Error if the user is not found
 	if (!users[index]) {
@@ -170,26 +186,17 @@ function findIndex(users, req, res) {
 		return -1;
 	}
 
+	// Error if not authorized
+	if (req.user.id !== req.params.id) {
+		res.status(403).json({
+			success: false,
+			message: "Forbidden",
+		});
+		return -1;
+	}
+
 	// Return the index of the user
 	return index;
-}
-
-/**
- * Check if a user already exists in the database
- * @param {User[]} users Users from the database
- * @param {Express.Request} req Request object
- * @param {Express.Response} res Response object
- * @returns Index of the user in the database
- */
-function alreadyExists(users, req, res) {
-	if (users.find(user => user.username === req.body.username)) {
-		res.status(409).json({
-			success: false,
-			message: "User already exists",
-		});
-		return true;
-	}
-	return false;
 }
 
 export default router;

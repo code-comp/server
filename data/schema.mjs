@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const User = z
+export const UserSchema = z
 	.object({
 		// ID must be a string that is a valid UUID
 		id: z
@@ -63,3 +63,12 @@ export const User = z
 		}),
 	})
 	.strict({ message: "Invalid user" });
+
+export const PasswordSchema = z
+	.string({ message: "Password must be a string" })
+	.min(8, { message: "Password must be at least 8 characters long" })
+	.max(32, { message: "Password must be at most 32 characters long" })
+	.regex(/[a-z]/, { message: "Password must contain at least one lowercase letter" })
+	.regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
+	.regex(/[0-9]/, { message: "Password must contain at least one number" })
+	.regex(/[^a-zA-Z0-9]/, { message: "Password must contain at least one special character" });
