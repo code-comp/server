@@ -106,10 +106,19 @@ export function isAuthenticated(req, res, next) {
 		const token = req.headers.authorization.split(" ")[1];
 		try {
 			const decoded = jwt.verify(token, process.env.JWT_SECRET);
-			req.user = decoded;
-			next();
+			if (decoded.exp > Date.now() / 1000) {
+				// Token is valid
+				req.user = decoded;
+				next();
+			} else {
+				// Token is expired
+				res.status(401).json({
+					success: false,
+					message: "Token is expired",
+				});
+			}
 		} catch (err) {
-			return res.status(401).json({
+			res.status(401).json({
 				success: false,
 				message: "Invalid token",
 			});
@@ -117,7 +126,7 @@ export function isAuthenticated(req, res, next) {
 	} else if (req.path === "/auth" || req.method === "OPTIONS") {
 		next();
 	} else {
-		return res.status(401).json({
+		res.status(401).json({
 			success: false,
 			message: "No token provided",
 		});
