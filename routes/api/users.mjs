@@ -1,8 +1,7 @@
 import crypto from "crypto";
 import * as Express from "express";
 import { Router } from "express";
-import { database, Password } from "../../data/database.mjs";
-const db = database("users");
+import { parseUsers, Password, Users } from "../../data/database.mjs";
 
 const router = Router();
 
@@ -12,8 +11,8 @@ router
 
 	// GET /api/users (admin only)
 	.get(async (req, res) => {
-		// Read from the database
-		const users = await db.read();
+		// Find all users
+		const users = Users.find({});
 
 		if (!users.find(user => user.id === req.user.id)?.roles?.includes("admin")) {
 			return res.status(403).json({
@@ -35,20 +34,35 @@ router
 
 	// POST /api/users
 	.post(async (req, res) => {
-		// Read from the database
-		const users = await db.read();
+		// Parse the users
+		const parsed = parseUsers(
+			req.body.map(user => ({
+				...user,
+				id: crypto.randomUUID(),
+				password: new Password(user.password),
+				metadata: {
+					created: new Date(),
+					updated: new Date(),
+				},
+			}))
+		);
 
-		// Add a new user to the database
-		users.push({
-			...req.body,
-			id: crypto.randomUUID(),
-			password: new Password(req.body.password),
-			metadata: {
-				created: new Date(),
-				updated: new Date(),
-			},
+		if (!parsed.success) {
+			return res.status(400).json(parsed);
+		}
+
+		// Insert the users into the database
+		await Users.insertMany(parsed.users);
+
+		// Remove passwords from the response
+		return res.status(201).json({
+			success: true,
+			message: "Users created successfully",
+			users: parsed.users.map(user => {
+				delete user.password;
+				return user;
+			}),
 		});
-		await db.write(users, res);
 	})
 
 	// OPTIONS /api/users
@@ -77,75 +91,130 @@ router
 
 	// GET /api/users/:id
 	.get(isAuthorized, async (req, res) => {
-		const users = await db.read();
-
 		// Find the user in the database
-		const index = findIndex(users, req, res);
-		// Error if the user is not found
-		if (index === -1) return;
+		const user = Users.findOne({ id: req.params.id });
+
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found",
+			});
+		}
 
 		// Remove the password from the response
-		delete users[index].password;
+		delete user.password;
 
-		// Send the user data
 		return res.json({
 			success: true,
 			message: "User retrieved successfully",
-			user: users[index],
+			user,
 		});
 	})
 
 	// PUT /api/users/:id
 	.put(isAuthorized, async (req, res) => {
-		// Find the user in the database
-		const users = await db.read();
-		const index = findIndex(users, req, res);
-		if (index === -1) return;
+		// Find the users in the database
+		const user = Users.findOne({ id: req.params.id });
 
-		// Replace the user data in the database
-		users[index] = {
-			...req.body,
-			id: users[index].id,
-			password: new Password(req.body.password),
-			metadata: {
-				created: users[index].metadata.created,
-				updated: new Date(),
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found",
+			});
+		}
+
+		// Parse the user
+		const parsed = parseUsers([
+			{
+				...req.body,
+				id: req.params.id,
+				password: new Password(req.body.password),
+				metadata: {
+					created: user.metadata.created,
+					updated: new Date(),
+				},
 			},
-		};
-		await db.write(users, res);
+		]);
+
+		if (!parsed.success) {
+			return res.status(400).json(parsed);
+		}
+
+		// Update the user in the database
+		await Users.updateOne({ id: req.params.id }, parsed.users[0]);
+
+		// Remove the password from the response
+		delete parsed.users[0].password;
+
+		return res.json({
+			success: true,
+			message: "User replaced successfully",
+			user: parsed.users[0],
+		});
 	})
 
 	// PATCH /api/users/:id
 	.patch(isAuthorized, async (req, res) => {
 		// Find the user in the database
-		const users = await db.read();
-		const index = findIndex(users, req, res);
-		if (index === -1) return;
+		const user = Users.findOne({ id: req.params.id });
 
-		// Update the user data in the database
-		users[index] = {
-			...users[index],
-			...req.body,
-			password: new Password(req.body.password),
-			id: users[index].id,
-			metadata: {
-				created: users[index].metadata.created,
-				updated: new Date(),
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found",
+			});
+		}
+
+		// Parse the user
+		const parsed = parseUsers([
+			{
+				...user,
+				...req.body,
+				password: new Password(req.body.password),
+				id: req.params.id,
+				metadata: {
+					created: user.metadata.created,
+					updated: new Date(),
+				},
 			},
-		};
-		await db.write(users, res);
+		]);
+
+		if (!parsed.success) {
+			return res.status(400).json(parsed);
+		}
+
+		// Update the user in the database
+		await Users.updateOne({ id: req.params.id }, parsed.users[0]);
+
+		// Remove the password from the response
+		delete parsed.users[0].password;
+
+		return res.json({
+			success: true,
+			message: "User updated successfully",
+			user: parsed.users[0],
+		});
 	})
 
 	// DELETE /api/users/:id
 	.delete(isAuthorized, async (req, res) => {
 		// Find the user in the database
-		const users = await db.read();
-		const index = findIndex(users, req, res);
-		if (index === -1) return;
+		const user = Users.findOne({ id: req.params.id });
 
-		// Remove the user from the database
-		users.splice(index, 1);
-		await db.write(users, res);
+		if (!user) {
+			return res.status(404).json({
+				success: false,
+				message: "User not found",
+			});
+		}
+
+		// Delete the user from the database
+		await Users.deleteOne({ id: req.params.id });
+
+		return res.json({
+			success: true,
+			message: "User deleted successfully",
+		});
 	})
 
 	// OPTIONS /api/users/:id
@@ -184,30 +253,6 @@ function isAuthorized(req, res, next) {
 	} else {
 		next();
 	}
-}
-
-/**
- * Find the index of a user in the database
- * @param {User[]} users Users from the database
- * @param {Express.Request} req
- * @param {Express.Response} res
- * @returns Index of the user in the database or -1 if not found
- */
-function findIndex(users, req, res) {
-	// Find the user in the database
-	const index = users.findIndex(user => user.id === req.params.id);
-
-	// Error if the user is not found
-	if (!users[index]) {
-		res.status(404).json({
-			success: false,
-			message: "User not found",
-		});
-		return -1;
-	}
-
-	// Return the index of the user
-	return index;
 }
 
 export default router;

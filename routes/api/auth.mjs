@@ -1,9 +1,8 @@
 import * as Express from "express";
 import { Router } from "express";
 import jwt from "jsonwebtoken";
-import { database, Password } from "../../data/database.mjs";
+import { Users, Password } from "../../data/database.mjs";
 import { PasswordSchema } from "../../data/schema.mjs";
-const db = database("users");
 
 const router = Router();
 
@@ -14,8 +13,7 @@ router
 	// POST /api/auth
 	.post(async (req, res) => {
 		// Find the user in the database
-		const users = await db.read();
-		const user = users.find(user => user.id === req.body.id || user.username === req.body.username);
+		const user = Users.find({ $or: [{ id: req.body.id }, { username: req.body.username }] });
 
 		// Check if the user exists
 		if (!user) {
