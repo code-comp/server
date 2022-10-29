@@ -1,3 +1,4 @@
+import * as Express from "express";
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { database, Password } from "../../data/database.mjs";
@@ -91,6 +92,12 @@ function validate(password, { hash, salt }) {
 	}
 }
 
+/**
+ * Check if the user is authenticated
+ * @param {Express.Request} req
+ * @param {Express.Response} res
+ * @param {Express.NextFunction} next
+ */
 export function isAuthenticated(req, res, next) {
 	// Check if the user is authenticated
 	if (req.headers.authorization) {

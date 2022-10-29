@@ -62,9 +62,19 @@ class Database {
 	}
 }
 
+/**
+ * Get the database instance
+ * @param {string} type Database type
+ * @returns Database instance
+ */
 export const database = type => new Database(type);
 
 export class Password {
+	/**
+	 * Prepare a password for storage
+	 * @param {string} password The password to hash and salt
+	 * @returns {object} The hashed and salted password
+	 */
 	constructor(password) {
 		const parsed = PasswordSchema.safeParse(password);
 		if (!parsed.success) {
@@ -78,10 +88,21 @@ export class Password {
 		};
 	}
 
+	/**
+	 * Generate a random salt
+	 * @param {number} length The length of the salt
+	 * @returns {string} The generated salt
+	 */
 	generateSalt(length = 16) {
 		return crypto.randomBytes(length).toString("hex");
 	}
 
+	/**
+	 * Generate a hash from a password and salt
+	 * @param {string} password The password to hash
+	 * @param {string} salt The salt to use
+	 * @returns {string} The hashed password
+	 */
 	static generateHash(password, salt) {
 		return crypto.pbkdf2Sync(password, salt, 1000, 64, "sha512").toString("hex");
 	}

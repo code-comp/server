@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import * as Express from "express";
 import { Router } from "express";
 import { database, Password } from "../../data/database.mjs";
 const db = database("users");
@@ -174,11 +175,17 @@ router
 	});
 
 /**
- * Find the index of a user in the database if authorized
+ * Check if the user is authorized
+ * @param {Express.Request} req
+ * @param {Express.Response} res
+ * @param {Express.NextFunction} next
+ */
+/**
+ * Find the index of a user in the database
  * @param {User[]} users Users from the database
- * @param {Express.Request} req Request object
- * @param {Express.Response} res Response object
- * @returns Index of the user in the database or -1 if not found or not authorized
+ * @param {Express.Request} req
+ * @param {Express.Response} res
+ * @returns Index of the user in the database or -1 if not found
  */
 function findIndex(users, req, res) {
 	// Find the user in the database
