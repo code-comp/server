@@ -11,6 +11,22 @@ export const UserSchema = z
 				message: "ID must be a valid UUID",
 			}),
 
+		// A set of roles that the user has
+		roles: z
+			.set(
+				z.string(
+					{
+						message: "Roles must be a string",
+					},
+					{
+						// Roles must be one of the following
+						validation: roles => roles.every(role => ["admin"].includes(role)),
+						message: "Roles must be one of the following: admin",
+					}
+				)
+			)
+			.default(new Set()),
+
 		// Username must be a string between 3 and 20 characters long and must not contain any special characters
 		username: z
 			.string({ message: "Username must be a string" })

@@ -9,10 +9,17 @@ const router = Router();
 router
 	.route("/")
 
-	// GET /api/users
+	// GET /api/users (admin only)
 	.get(async (req, res) => {
 		// Read from the database
 		const users = await db.read();
+
+		if (!users.find(user => user.id === req.user.id)?.roles?.includes("admin")) {
+			return res.status(403).json({
+				success: false,
+				message: "Forbidden",
+			});
+		}
 
 		// Remove passwords from the response
 		return res.json({

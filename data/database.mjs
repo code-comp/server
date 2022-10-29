@@ -33,6 +33,9 @@ class Database {
 			user.metadata.created = new Date(user.metadata.created);
 			user.metadata.updated = new Date(user.metadata.updated);
 
+			// Coerce the roles into a set
+			user.roles = new Set(user.roles);
+
 			// Parse the users against the model without throwing errors
 			return UserSchema.safeParse(user);
 		});
@@ -55,10 +58,6 @@ class Database {
 		return res.json({
 			success: true,
 			message: "Users updated successfully",
-			users: validUsers.map(user => {
-				delete user.password;
-				return user;
-			}),
 		});
 	}
 }
