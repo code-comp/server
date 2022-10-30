@@ -1,8 +1,13 @@
-import * as Express from "express";
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-import jwt from "jsonwebtoken";
-import { Users, Password } from "../../data/database.mjs";
-import { PasswordSchema } from "../../data/schema.mjs";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { Password, PasswordValidation, Users, ValidationResult } from "../../data/database.js";
+import { PasswordSchema } from "../../data/schema.js";
+
+const JWT_SECRET = process.env["JWT_SECRET"];
+if (!JWT_SECRET) {
+	throw new Error("JWT_SECRET is not defined");
+}
 
 const router = Router();
 
@@ -11,9 +16,9 @@ router
 	.route("/")
 
 	// POST /api/auth
-	.post(async (req, res) => {
+	.post(async (req: Request, res: Response) => {
 		// Find the user in the database
-		const user = Users.find({ $or: [{ id: req.body.id }, { username: req.body.username }] });
+		const user = await Users.findOne({ $or: [{ id: req.body.id }, { username: req.body.username }] });
 
 		// Check if the user exists
 		if (!user) {
@@ -24,27 +29,27 @@ router
 		}
 
 		// Check if the password is correct
-		const validation = validate(req.body.password, user.password);
+		const validation = validate(req.body.password, user?.["password"]);
 		if (user && validation.success) {
-			res.status(200).json({
+			return res.status(200).json({
 				success: true,
-				message: `Authentication successful! ${validation.message}. Welcome, ${user.username}!`,
-				id: user.id,
-				token: jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+				message: `Authentication successful! ${validation.message}. Welcome, ${user["username"]}!`,
+				id: user["id"],
+				token: jwt.sign({ id: user["id"] }, JWT_SECRET, {
 					expiresIn: "24h",
 				}),
 			});
 		} else {
-			res.status(403).json({
+			return res.status(403).json({
 				success: false,
 				message: "Incorrect username or password",
-				error: validation.error,
+				error: validation.errors,
 			});
 		}
 	})
 
 	// OPTIONS /api/auth
-	.options(async (req, res) => {
+	.options(async (_req: Request, res: Response) => {
 		// Allow CORS preflight
 		res.set("Access-Control-Allow-Origin", "*");
 		res.set("Access-Control-Allow-Methods", "POST");
@@ -55,7 +60,7 @@ router
 	})
 
 	// All other methods
-	.all(async (req, res) => {
+	.all(async (_req: Request, res: Response) => {
 		res.set("Allow", "POST");
 		return res.status(405).json({
 			success: false,
@@ -65,20 +70,20 @@ router
 
 /**
  * Checks if the password is valid
- * @param {string} password The password to check
- * @param {string} hash The hash stored in the database to check against
- * @returns {object} The validation result
+ * @param {string} password The password to validate
+ * @param {PasswordValidation} validation The validation object
+ * @returns {ValidationResult} The validation result
  */
-function validate(password, { hash, salt }) {
-	password = PasswordSchema.safeParse(password);
-	if (!password.success) {
+function validate(password: string, { hash, salt }: PasswordValidation): ValidationResult {
+	const parsed = PasswordSchema.safeParse(password);
+	if (!parsed.success) {
 		return {
 			success: false,
 			message: "Invalid password",
-			error: password.error.format(),
+			errors: parsed.error.format(),
 		};
 	}
-	if (hash === Password.generateHash(password.data, salt)) {
+	if (hash === Password.generateHash(parsed.data, salt)) {
 		return {
 			success: true,
 			message: "Password is correct",
@@ -97,16 +102,19 @@ function validate(password, { hash, salt }) {
  * @param {Express.Response} res
  * @param {Express.NextFunction} next
  */
-export function isAuthenticated(req, res, next) {
-	// Check if the user is authenticated
-	if (req.headers.authorization) {
-		// Get the token from the header
-		const token = req.headers.authorization.split(" ")[1];
+export function isAuthenticated(req: Request, res: Response, next: NextFunction) {
+	if (!JWT_SECRET) {
+		throw new Error("JWT_SECRET is not defined");
+	}
+
+	// Get the token from the header
+	const token = req.headers.authorization?.split(" ")[1];
+	if (token) {
 		try {
-			const decoded = jwt.verify(token, process.env.JWT_SECRET);
-			if (decoded.exp > Date.now() / 1000) {
+			const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+			if (decoded.exp ?? 0 > Date.now() / 1000) {
 				// Token is valid
-				req.user = decoded;
+				req.user.id = decoded["id"];
 				next();
 			} else {
 				// Token is expired

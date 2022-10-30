@@ -1,6 +1,6 @@
 import express, { Router } from "express";
-import auth, { isAuthenticated } from "./api/auth.mjs";
-import users from "./api/users.mjs";
+import auth, { isAuthenticated } from "./api/auth.js";
+import users from "./api/users.js";
 
 const router = Router();
 

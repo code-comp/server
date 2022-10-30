@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import * as Express from "express";
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
-import { parseUsers, Password, Users } from "../../data/database.mjs";
+import { parseUsers, Password, Users } from "../../data/database.js";
 
 const router = Router();
 
@@ -10,11 +10,12 @@ router
 	.route("/")
 
 	// GET /api/users (admin only)
-	.get(async (req, res) => {
+	.get(async (req: Request, res: Response) => {
 		// Find all users
-		const users = Users.find({});
+		const users = await Users.find({}).toArray();
 
-		if (!users.find(user => user.id === req.user.id)?.roles?.includes("admin")) {
+		// Check if this user is an admin
+		if ((await Users.findOne({ id: req.user?.id }))?.["roles"].includes("admin")) {
 			return res.status(403).json({
 				success: false,
 				message: "Forbidden",
@@ -26,20 +27,29 @@ router
 			success: true,
 			message: "Users retrieved successfully",
 			users: users.map(user => {
-				delete user.password;
+				delete user["password"];
 				return user;
 			}),
 		});
 	})
 
 	// POST /api/users
-	.post(async (req, res) => {
+	.post(async (req: Request, res: Response) => {
+		const users = req.body;
+
+		if (!Array.isArray(users)) {
+			return res.status(400).json({
+				success: false,
+				message: "Invalid request",
+			});
+		}
+
 		// Parse the users
-		const parsed = parseUsers(
-			req.body.map(user => ({
+		const parsed = await parseUsers(
+			users.map(user => ({
 				...user,
 				id: crypto.randomUUID(),
-				password: new Password(user.password),
+				password: new Password(user.password).result,
 				metadata: {
 					created: new Date(),
 					updated: new Date(),
@@ -47,7 +57,7 @@ router
 			}))
 		);
 
-		if (!parsed.success) {
+		if (!parsed.success || !parsed.users) {
 			return res.status(400).json(parsed);
 		}
 
@@ -58,7 +68,8 @@ router
 		return res.status(201).json({
 			success: true,
 			message: "Users created successfully",
-			users: parsed.users.map(user => {
+			users: parsed.users?.map(user => {
+				// @ts-expect-error
 				delete user.password;
 				return user;
 			}),
@@ -66,7 +77,7 @@ router
 	})
 
 	// OPTIONS /api/users
-	.options(async (req, res) => {
+	.options(async (_req: Request, res: Response) => {
 		// Allow CORS preflight
 		res.set("Access-Control-Allow-Origin", "*");
 		res.set("Access-Control-Allow-Methods", "POST");
@@ -77,7 +88,7 @@ router
 	})
 
 	// All other methods
-	.all(async (req, res) => {
+	.all(async (_req: Request, res: Response) => {
 		res.set("Allow", "GET, POST");
 		return res.status(405).json({
 			success: false,
@@ -90,9 +101,9 @@ router
 	.route("/:id")
 
 	// GET /api/users/:id
-	.get(isAuthorized, async (req, res) => {
+	.get(isAuthorized, async (req: Request, res: Response) => {
 		// Find the user in the database
-		const user = Users.findOne({ id: req.params.id });
+		const user = await Users.findOne({ id: req.params["id"] });
 
 		if (!user) {
 			return res.status(404).json({
@@ -102,7 +113,7 @@ router
 		}
 
 		// Remove the password from the response
-		delete user.password;
+		delete user["password"];
 
 		return res.json({
 			success: true,
@@ -112,9 +123,9 @@ router
 	})
 
 	// PUT /api/users/:id
-	.put(isAuthorized, async (req, res) => {
+	.put(isAuthorized, async (req: Request, res: Response) => {
 		// Find the users in the database
-		const user = Users.findOne({ id: req.params.id });
+		const user = await Users.findOne({ id: req.params["id"] });
 
 		if (!user) {
 			return res.status(404).json({
@@ -124,26 +135,27 @@ router
 		}
 
 		// Parse the user
-		const parsed = parseUsers([
+		const parsed = await parseUsers([
 			{
 				...req.body,
-				id: req.params.id,
-				password: new Password(req.body.password),
+				id: req.params["id"],
+				password: new Password(req.body.password).result,
 				metadata: {
-					created: user.metadata.created,
+					created: user["metadata"].created,
 					updated: new Date(),
 				},
 			},
 		]);
 
-		if (!parsed.success) {
+		if (!parsed.success || !parsed.users?.[0]) {
 			return res.status(400).json(parsed);
 		}
 
 		// Update the user in the database
-		await Users.updateOne({ id: req.params.id }, parsed.users[0]);
+		await Users.updateOne({ id: req.params["id"] }, parsed.users[0]);
 
 		// Remove the password from the response
+		// @ts-expect-error
 		delete parsed.users[0].password;
 
 		return res.json({
@@ -154,9 +166,9 @@ router
 	})
 
 	// PATCH /api/users/:id
-	.patch(isAuthorized, async (req, res) => {
+	.patch(isAuthorized, async (req: Request, res: Response) => {
 		// Find the user in the database
-		const user = Users.findOne({ id: req.params.id });
+		const user = await Users.findOne({ id: req.params["id"] });
 
 		if (!user) {
 			return res.status(404).json({
@@ -166,27 +178,28 @@ router
 		}
 
 		// Parse the user
-		const parsed = parseUsers([
+		const parsed = await parseUsers([
 			{
 				...user,
 				...req.body,
-				password: new Password(req.body.password),
-				id: req.params.id,
+				password: new Password(req.body.password).result,
+				id: req.params["id"],
 				metadata: {
-					created: user.metadata.created,
+					created: user["metadata"].created,
 					updated: new Date(),
 				},
 			},
 		]);
 
-		if (!parsed.success) {
+		if (!parsed.success || !parsed.users?.[0]) {
 			return res.status(400).json(parsed);
 		}
 
 		// Update the user in the database
-		await Users.updateOne({ id: req.params.id }, parsed.users[0]);
+		await Users.updateOne({ id: req.params["id"] }, parsed.users[0]);
 
 		// Remove the password from the response
+		// @ts-expect-error
 		delete parsed.users[0].password;
 
 		return res.json({
@@ -197,9 +210,9 @@ router
 	})
 
 	// DELETE /api/users/:id
-	.delete(isAuthorized, async (req, res) => {
+	.delete(isAuthorized, async (req: Request, res: Response) => {
 		// Find the user in the database
-		const user = Users.findOne({ id: req.params.id });
+		const user = await Users.findOne({ id: req.params["id"] });
 
 		if (!user) {
 			return res.status(404).json({
@@ -209,7 +222,7 @@ router
 		}
 
 		// Delete the user from the database
-		await Users.deleteOne({ id: req.params.id });
+		await Users.deleteOne({ id: req.params["id"] });
 
 		return res.json({
 			success: true,
@@ -218,7 +231,7 @@ router
 	})
 
 	// OPTIONS /api/users/:id
-	.options(async (req, res) => {
+	.options(async (_req: Request, res: Response) => {
 		// Allow CORS preflight
 		res.set("Access-Control-Allow-Origin", "*");
 		res.set("Access-Control-Allow-Methods", "POST");
@@ -229,7 +242,7 @@ router
 	})
 
 	// All other methods
-	.all(async (req, res) => {
+	.all(async (_req: Request, res: Response) => {
 		res.set("Allow", "GET, PUT, PATCH, DELETE");
 		return res.status(405).json({
 			success: false,
@@ -243,9 +256,9 @@ router
  * @param {Express.Response} res
  * @param {Express.NextFunction} next
  */
-function isAuthorized(req, res, next) {
-	if (req.user?.id !== req.params.id) {
-		console.log(req.user, req.params.id);
+function isAuthorized(req: Request, res: Response, next: NextFunction) {
+	if (req.user?.id !== req.params["id"]) {
+		console.log(req.user, req.params["id"]);
 		res.status(403).json({
 			success: false,
 			message: "Forbidden",
