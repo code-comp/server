@@ -1,4 +1,4 @@
-import type { UserSchema } from "./data/schema.js";
+import type { Request } from "express";
 
 // Merge a user ID into the request object
 declare global {
