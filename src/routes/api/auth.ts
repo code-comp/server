@@ -27,7 +27,6 @@ router
 				message: "User not found",
 			});
 		}
-
 		// Check if the password is correct
 		const validation = validate(req.body.password, user?.["password"]);
 		if (user && validation.success) {
@@ -110,29 +109,34 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 	// Get the token from the header
 	const token = req.headers.authorization?.split(" ")[1];
 	if (token) {
+		let decoded: JwtPayload | undefined;
 		try {
-			const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-			if (decoded.exp ?? 0 > Date.now() / 1000) {
-				// Token is valid
-				req.user.id = decoded["id"];
-				next();
-			} else {
-				// Token is expired
-				res.status(401).json({
-					success: false,
-					message: "Token is expired",
-				});
-			}
+			decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
 		} catch (err) {
-			res.status(401).json({
+			return res.status(401).json({
 				success: false,
 				message: "Invalid token",
 			});
 		}
-	} else if (req.path === "/auth" || req.method === "OPTIONS") {
-		next();
+		if (decoded) {
+			if (decoded.exp ?? 0 > Date.now() / 1000) {
+				// Token is valid
+				req.user = {
+					id: decoded["id"],
+				};
+				next();
+			} else {
+				// Token is expired
+				return res.status(401).json({
+					success: false,
+					message: "Token is expired",
+				});
+			}
+		}
+	} else if (req.method === "OPTIONS" || req.path === "/auth" || (req.method === "POST" && req.path === "/users")) {
+		return next();
 	} else {
-		res.status(401).json({
+		return res.status(401).json({
 			success: false,
 			message: "No token provided",
 		});

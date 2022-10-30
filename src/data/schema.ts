@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const VALID_ROLES = ["admin"] as const;
+
 export const UserSchema = z
 	.object({
 		// ID must be a string that is a valid UUID
@@ -20,8 +22,11 @@ export const UserSchema = z
 				}).optional(),
 			)
 			.default(new Set()).refine(
-				// Roles must be one of the following
-				roles => [...roles].every((role) => ["admin"].includes(role as string)),
+				// Role cannot be admin and it must be a valid role
+				roles => !roles.has("admin") && Array.from(roles).every((role)=> VALID_ROLES.includes(role as typeof VALID_ROLES[number])),
+				{
+					message: "Admin role cannot be assigned to a user",
+				}
 			),
 
 		// Username must be a string between 3 and 20 characters long and must not contain any special characters
@@ -93,8 +98,7 @@ export const UserSchema = z
 				required_error: "Updated timestamp is required",
 			}),
 		}),
-	})
-	.strict({ message: "Invalid user" });
+	});
 
 export const PasswordSchema = z
 	.string({

@@ -15,7 +15,7 @@ router
 		const users = await Users.find({}).toArray();
 
 		// Check if this user is an admin
-		if ((await Users.findOne({ id: req.user?.id }))?.["roles"].includes("admin")) {
+		if (!(await Users.findOne({ id: req.user?.id }))?.["roles"]?.includes("admin")) {
 			return res.status(403).json({
 				success: false,
 				message: "Forbidden",
@@ -25,7 +25,7 @@ router
 		// Remove passwords from the response
 		return res.json({
 			success: true,
-			message: "Users retrieved successfully",
+			message: "Users retrieved successfully (admin only)",
 			users: users.map(user => {
 				delete user["password"];
 				return user;
@@ -40,25 +40,41 @@ router
 		if (!Array.isArray(users)) {
 			return res.status(400).json({
 				success: false,
-				message: "Invalid request",
+				message: "Invalid request. The request body must be an array of users.",
 			});
 		}
 
 		// Parse the users
-		const parsed = await parseUsers(
-			users.map(user => ({
+		const toParse = [];
+		for (const user of users) {
+			// Parse the password
+			const password = new Password(user.password);
+			if (!password.result.success) {
+				return res.status(400).json({
+					success: false,
+					message: "Unnaceptable password",
+					errors: password.result.errors,
+				});
+			}
+
+			toParse.push({
 				...user,
 				id: crypto.randomUUID(),
-				password: new Password(user.password).result,
+				password: password.result.data,
 				metadata: {
 					created: new Date(),
 					updated: new Date(),
 				},
-			}))
-		);
+			});
+		}
+		const parsed = await parseUsers(toParse);
 
 		if (!parsed.success || !parsed.users) {
-			return res.status(400).json(parsed);
+			return res.status(400).json({
+				success: false,
+				message: "Invalid users",
+				errors: parsed.errors,
+			});
 		}
 
 		// Insert the users into the database
@@ -134,12 +150,26 @@ router
 			});
 		}
 
+		if (req.body.password) {
+			// Parse the password
+			const password = new Password(req.body.password);
+			if (!password.result.success) {
+				return res.status(400).json({
+					success: false,
+					message: "Unnaceptable password",
+					errors: password.result.errors,
+				});
+			}
+
+			// Update the password
+			req.body.password = password.result.data;
+		}
+
 		// Parse the user
 		const parsed = await parseUsers([
 			{
 				...req.body,
 				id: req.params["id"],
-				password: new Password(req.body.password).result,
 				metadata: {
 					created: user["metadata"].created,
 					updated: new Date(),
@@ -148,11 +178,15 @@ router
 		]);
 
 		if (!parsed.success || !parsed.users?.[0]) {
-			return res.status(400).json(parsed);
+			return res.status(400).json({
+				success: false,
+				message: "Invalid user",
+				errors: parsed.errors,
+			});
 		}
 
-		// Update the user in the database
-		await Users.updateOne({ id: req.params["id"] }, parsed.users[0]);
+		// Replace the user in the database
+		await Users.replaceOne({ id: req.params["id"] }, parsed.users[0]);
 
 		// Remove the password from the response
 		// @ts-expect-error
@@ -177,12 +211,26 @@ router
 			});
 		}
 
+		if (req.body.password) {
+			// Parse the password
+			const password = new Password(req.body.password);
+			if (!password.result.success) {
+				return res.status(400).json({
+					success: false,
+					message: "Unnaceptable password",
+					errors: password.result.errors,
+				});
+			}
+
+			// Update the password
+			req.body.password = password.result.data;
+		}
+
 		// Parse the user
 		const parsed = await parseUsers([
 			{
 				...user,
 				...req.body,
-				password: new Password(req.body.password).result,
 				id: req.params["id"],
 				metadata: {
 					created: user["metadata"].created,
@@ -192,11 +240,15 @@ router
 		]);
 
 		if (!parsed.success || !parsed.users?.[0]) {
-			return res.status(400).json(parsed);
+			return res.status(400).json({
+				success: false,
+				message: "Invalid user",
+				errors: parsed.errors,
+			});
 		}
 
 		// Update the user in the database
-		await Users.updateOne({ id: req.params["id"] }, parsed.users[0]);
+		await Users.replaceOne({ id: req.params["id"] }, parsed.users[0]);
 
 		// Remove the password from the response
 		// @ts-expect-error
@@ -213,7 +265,6 @@ router
 	.delete(isAuthorized, async (req: Request, res: Response) => {
 		// Find the user in the database
 		const user = await Users.findOne({ id: req.params["id"] });
-
 		if (!user) {
 			return res.status(404).json({
 				success: false,
@@ -258,7 +309,6 @@ router
  */
 function isAuthorized(req: Request, res: Response, next: NextFunction) {
 	if (req.user?.id !== req.params["id"]) {
-		console.log(req.user, req.params["id"]);
 		res.status(403).json({
 			success: false,
 			message: "Forbidden",

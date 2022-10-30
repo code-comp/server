@@ -23,8 +23,12 @@ export const Users = database.collection("users");
 export async function parseUsers(users: UserSchema[]) {
 	const parsed = users.map(user => {
 		// Coerce the timestamps to dates
-		user.metadata.created = new Date(user.metadata.created);
-		user.metadata.updated = new Date(user.metadata.updated);
+		user.metadata ??= {
+			created: new Date(),
+			updated: new Date(),
+		};
+		user.metadata.created = new Date(user.metadata?.created);
+		user.metadata.updated = new Date(user.metadata?.updated);
 
 		// Coerce the roles into a set
 		user.roles = new Set(user.roles);
@@ -37,6 +41,9 @@ export async function parseUsers(users: UserSchema[]) {
 	const { validUsers, errors } = parsed.reduce(
 		({ validUsers, errors }, user) => {
 			if (user.success) {
+				// Coerce the roles into an array because MongoDB doesn't support sets
+				// @ts-expect-error
+				user.data.roles = Array.from(user.data.roles);
 				validUsers.push(user.data);
 			} else {
 				errors.push(user.error.format());
@@ -75,8 +82,10 @@ export type ValidationResult = {
 };
 
 interface PasswordValidationResult extends ValidationResult {
-	hash?: string;
-	salt?: string;
+	data?: {
+		hash?: string;
+		salt?: string;
+	};
 }
 
 export class Password {
@@ -91,7 +100,7 @@ export class Password {
 	constructor(password: string) {
 		const parsed = PasswordSchema.safeParse(password);
 		this.salt = this.generateSalt();
-		this.hash = Password.generateHash(password, this.salt);
+		this.hash = Password.generateHash(password , this.salt);
 		this.parsed = {
 			success: parsed.success,
 			message: parsed.success ? "Password parsed successfully" : "Invalid password",
@@ -114,8 +123,10 @@ export class Password {
 		return {
 			success: true,
 			message: "Password parsed successfully",
-			hash: this.hash,
-			salt: this.salt,
+			data: {
+				hash: this.hash,
+				salt: this.salt,
+			},
 		};
 	}
 
