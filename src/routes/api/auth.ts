@@ -47,17 +47,6 @@ router
 		}
 	})
 
-	// OPTIONS /api/auth
-	.options(async (_req: Request, res: Response) => {
-		// Allow CORS preflight
-		res.set("Access-Control-Allow-Origin", "*");
-		res.set("Access-Control-Allow-Methods", "POST");
-		res.set("Access-Control-Allow-Headers", "Content-Type");
-		res.set("Access-Control-Max-Age", "3600");
-		res.set("Allow", "POST");
-		res.status(204).end();
-	})
-
 	// All other methods
 	.all(async (_req: Request, res: Response) => {
 		res.set("Allow", "POST");
@@ -133,7 +122,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 				});
 			}
 		}
-	} else if (req.method === "OPTIONS" || req.path === "/auth" || (req.method === "POST" && req.path === "/users")) {
+	} else if (req.path === "/auth" || (req.method === "POST" && req.path === "/users")) {
 		return next();
 	} else {
 		return res.status(401).json({

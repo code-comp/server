@@ -92,17 +92,6 @@ router
 		});
 	})
 
-	// OPTIONS /api/users
-	.options(async (_req: Request, res: Response) => {
-		// Allow CORS preflight
-		res.set("Access-Control-Allow-Origin", "*");
-		res.set("Access-Control-Allow-Methods", "POST");
-		res.set("Access-Control-Allow-Headers", "Content-Type");
-		res.set("Access-Control-Max-Age", "3600");
-		res.set("Allow", "GET, POST");
-		res.status(204).end();
-	})
-
 	// All other methods
 	.all(async (_req: Request, res: Response) => {
 		res.set("Allow", "GET, POST");
@@ -279,17 +268,6 @@ router
 			success: true,
 			message: "User deleted successfully",
 		});
-	})
-
-	// OPTIONS /api/users/:id
-	.options(async (_req: Request, res: Response) => {
-		// Allow CORS preflight
-		res.set("Access-Control-Allow-Origin", "*");
-		res.set("Access-Control-Allow-Methods", "POST");
-		res.set("Access-Control-Allow-Headers", "Content-Type");
-		res.set("Access-Control-Max-Age", "3600");
-		res.set("Allow", "GET, PUT, PATCH, DELETE");
-		res.status(204).end();
 	})
 
 	// All other methods
