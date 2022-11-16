@@ -34,8 +34,9 @@ router
 				success: true,
 				message: `Authentication successful! ${validation.message}. Welcome, ${user["username"]}!`,
 				id: user["id"],
-				token: jwt.sign({ id: user["id"] }, JWT_SECRET, {
+				token: jwt.sign({}, JWT_SECRET, {
 					expiresIn: "24h",
+					subject: user["id"],
 				}),
 			});
 		} else {
@@ -111,7 +112,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 			if (decoded.exp ?? 0 > Date.now() / 1000) {
 				// Token is valid
 				req.user = {
-					id: decoded["id"],
+					id: decoded["sub"]!,
 				};
 				next();
 			} else {
