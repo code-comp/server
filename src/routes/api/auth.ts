@@ -114,7 +114,7 @@ export function isAuthenticated(req: Request, res: Response, next: NextFunction)
 				req.user = {
 					id: decoded["sub"]!,
 				};
-				next();
+				return next();
 			} else {
 				// Token is expired
 				return res.status(401).json({
