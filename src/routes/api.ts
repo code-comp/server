@@ -35,7 +35,8 @@ router.use(express.json({ limit: Infinity }));
 
 // Throw an error if the request is too large
 router.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.headers["content-length"] && parseInt(req.headers["content-length"]) > 10) {
+    // Allow images up to 10MB
+    if (req.headers["content-length"] && parseInt(req.headers["content-length"]) > 10 ** 7) {
         return res.status(413).json({
             success: false,
             message: "Request too large",
