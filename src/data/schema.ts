@@ -23,7 +23,7 @@ export const UserSchema = z
 			)
 			.default(new Set()).refine(
 				// Role cannot be admin and it must be a valid role
-				roles => !roles.has("admin") && Array.from(roles).every((role)=> VALID_ROLES.includes(role as typeof VALID_ROLES[number])),
+				roles => !roles.has("admin") && Array.from(roles).every(role => VALID_ROLES.includes(role as typeof VALID_ROLES[number])),
 				{
 					message: "Admin role cannot be assigned to a user",
 				}
@@ -85,6 +85,14 @@ export const UserSchema = z
 				message: "Avatar must be a valid URL",
 			})
 			.optional(),
+
+		// Score must be a number >= 0 which defaults to 0
+		score: z.number({
+			invalid_type_error: "Score must be a number",
+			required_error: "Score is required",
+		}).gte(0, {
+			message: "Score must be greater than or equal to 0",
+		}).default(0),
 
 		metadata: z.object({
 			// Created timestamp must be a date
