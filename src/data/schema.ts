@@ -86,13 +86,26 @@ export const UserSchema = z
 			})
 			.optional(),
 
-		// Score must be a number >= 0 which defaults to 0
-		score: z.number({
-			invalid_type_error: "Score must be a number",
-			required_error: "Score is required",
-		}).gte(0, {
-			message: "Score must be greater than or equal to 0",
-		}).default(0),
+		// Challenges completed
+		challenges: z.array(
+			z.object({
+				// Challenge ID
+				id: z.string({
+					invalid_type_error: "Challenge ID must be a string",
+					required_error: "Challenge ID is required",
+				}).uuid({
+					message: "Challenge ID must be a valid UUID",
+				}),
+
+				// Challenge score
+				score: z.number({
+					invalid_type_error: "Challenge score must be a number",
+					required_error: "Challenge score is required",
+				}).gte(0, {
+					message: "Challenge score must be greater than or equal to 0",
+				}),
+			}),
+		).default([]),
 
 		metadata: z.object({
 			// Created timestamp must be a date
